@@ -31,7 +31,13 @@ class LeafNode {
 
         int index = findInsertPosition(key);
 
-        if
+        if ((index > 0) && (index < keys.size())){
+            if (keys.get(index) == key){
+                throw new IllegalArgumentException();
+            }
+            keys.add(index, key);
+            values.add(index, recordId);
+        }
     }
 
 
@@ -41,6 +47,14 @@ class LeafNode {
      * returns null if it doesn't exist
      * **/
     RecordId find(int key){
+        int index = findInsertPosition(key);
+
+        if (key > keys.size()){
+            return null;
+        }
+        if (keys.get(index) == key){
+            return values.get(index);
+        }
         return null;
     }
 
