@@ -14,14 +14,13 @@ public class InMemoryBPlusTree implements BPlusTree{
 
 	@Override
 	public void insert(int key, RecordId recordId) {
-		// TODO Auto-generated method stub
+
 		
 	}
 
 	@Override
 	public RecordId find(int key) {
-		// TODO Auto-generated method stub
-		return null;
+
 	}
 	
 }
