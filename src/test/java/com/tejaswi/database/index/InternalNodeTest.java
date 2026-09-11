@@ -36,13 +36,13 @@ class InternalNodeTest {
     @Test
     void reportsCapacityAndOverflowUsingInheritedNodeState() {
         InternalNode node = new InternalNode(2);
-        node.keys.add(10);
-        node.keys.add(20);
+        node.keyAt(10);
+        node.keyAt(20);
 
         assertTrue(node.isFull());
         assertFalse(node.hasOverflow());
 
-        node.keys.add(30);
+        node.keyAt(30);
 
         assertTrue(node.hasOverflow());
     }

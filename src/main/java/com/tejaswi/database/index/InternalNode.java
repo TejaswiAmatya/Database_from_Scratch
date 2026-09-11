@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 class InternalNode extends BPlusTreeNode{
-    List<BPlusTreeNode> children;
-    List<Integer> keys;
+    private List<BPlusTreeNode> children;
+    private List<Integer> keys;
     int maxKeys;
 
     InternalNode(int maxKeys){
@@ -44,23 +44,95 @@ class InternalNode extends BPlusTreeNode{
         return start;
     }
 
+
     private BPlusTreeNode childFor(int key){
-        return null;
+        int index = findChildIndex(key);
+        return children.get(index);
     }
 
     private BPlusTreeNode childAt(int index){
-        return null;
+        return children.get(index);
     }
 
     private boolean isOverfull(){
-        return false;
+        return keys.size() <= maxKeys;
     }
 
     private void insertSeparator(int separatorKey, BPlusTreeNode rightChild){
+        int i = findSeparatorInsertIndex(separatorKey);
+        keys.add(separatorKey, i);
+
+         children.add(i+1, rightChild);
+    }
+
+    private int findSeparatorInsertIndex(int separatorKey){
+
+        int start = 0;
+        int end = keys.size() - 1;
+
+        while(start<=end){
+            int mid = (start + end) / 2;
+
+            if (separatorKey > keys.get(mid)){
+                start = mid + 1;
+            }
+
+            else if (separatorKey < keys.get(mid)){
+                end = mid - 1;
+            }
+
+            else{
+                throw new IllegalArgumentException();
+            }
+        }
+
+        return start;
 
     }
 
-    private void validateStructure(){
+    private void validateStructure() {
+        if (keys == null) {
+            throw new IllegalStateException("Internal node keys list cannot be null.");
+        }
 
+        if (children == null) {
+            throw new IllegalStateException("Internal node children list cannot be null.");
+        }
+
+        if (children.size() != keys.size() + 1) {
+            throw new IllegalStateException(
+                    "Invalid internal node: expected " + (keys.size() + 1)
+                            + " children for " + keys.size()
+                            + " separator keys, but found " + children.size() + "."
+            );
+        }
+
+        for (int i = 0; i < keys.size(); i++) {
+            if (keys.get(i) == null) {
+                throw new IllegalStateException(
+                        "Invalid internal node: separator key at index " + i + " is null."
+                );
+            }
+        }
+
+        for (int i = 1; i < keys.size(); i++) {
+            int previousKey = keys.get(i - 1);
+            int currentKey = keys.get(i);
+
+            if (previousKey >= currentKey) {
+                throw new IllegalStateException(
+                        "Invalid internal node: separator keys must be strictly increasing. "
+                                + "Found " + previousKey + " before " + currentKey + "."
+                );
+            }
+        }
+
+        for (int i = 0; i < children.size(); i++) {
+            if (children.get(i) == null) {
+                throw new IllegalStateException(
+                        "Invalid internal node: child at index " + i + " is null."
+                );
+            }
+        }
     }
 }
