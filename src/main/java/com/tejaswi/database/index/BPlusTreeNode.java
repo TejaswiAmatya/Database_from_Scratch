@@ -55,6 +55,9 @@ abstract class BPlusTreeNode {
         return start;
     }
 
+    boolean hasOverflow() {
+        return keys.size() > maxKeys;
+    }
     // Optional later:
     // boolean hasOverflow()
     // int firstKey()

@@ -5,12 +5,12 @@ import com.tejaswi.database.record.RecordId;
 import java.util.ArrayList;
 import java.util.List;
 
-class LeafNode {
+class LeafNode extends BPlusTreeNode{
     private final List<Integer> keys;
     private final List<RecordId> values;
 
-
-    public LeafNode(){
+    public LeafNode(int maxKeys){
+        super(maxKeys);
         keys = new ArrayList<Integer>();
         values = new ArrayList<RecordId>();
     }
@@ -76,4 +76,8 @@ class LeafNode {
     }
 
 
+    @Override
+    boolean isLeaf() {
+        return true;
+    }
 }

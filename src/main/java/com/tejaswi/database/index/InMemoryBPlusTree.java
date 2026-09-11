@@ -14,13 +14,12 @@ public class InMemoryBPlusTree implements BPlusTree{
 
 	@Override
 	public void insert(int key, RecordId recordId) {
-
 		
 	}
 
 	@Override
 	public RecordId find(int key) {
-
+		return null;
 	}
 	
 }
