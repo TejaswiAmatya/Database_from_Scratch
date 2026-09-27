@@ -45,7 +45,7 @@ class InternalNode extends BPlusTreeNode{
     }
 
 
-    private BPlusTreeNode childFor(int key){
+    BPlusTreeNode childFor(int key){
         int index = findChildIndex(key);
         return children.get(index);
     }

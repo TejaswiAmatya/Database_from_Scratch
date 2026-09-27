@@ -6,12 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 class LeafNode extends BPlusTreeNode{
-    private final List<Integer> keys;
     private final List<RecordId> values;
 
     public LeafNode(int maxKeys){
         super(maxKeys);
-        keys = new ArrayList<Integer>();
         values = new ArrayList<RecordId>();
     }
     /**
@@ -31,13 +29,12 @@ class LeafNode extends BPlusTreeNode{
 
         int index = findInsertPosition(key);
 
-        if ((index > 0) && (index < keys.size())){
-            if (keys.get(index) == key){
-                throw new IllegalArgumentException();
-            }
-            keys.add(index, key);
-            values.add(index, recordId);
+        if (index < keys.size() && keys.get(index) == key){
+            throw new IllegalArgumentException();
         }
+
+        keys.add(index, key);
+        values.add(index, recordId);
     }
 
 
@@ -49,13 +46,10 @@ class LeafNode extends BPlusTreeNode{
     RecordId find(int key){
         int index = findInsertPosition(key);
 
-        if (key > keys.size()){
+        if (index >= keys.size() || keys.get(index) != key){
             return null;
         }
-        if (keys.get(index) == key){
-            return values.get(index);
-        }
-        return null;
+        return values.get(index);
     }
 
     /**
@@ -70,6 +64,8 @@ class LeafNode extends BPlusTreeNode{
                 start = mid + 1;
             } else if (key < keys.get(mid)) {
                 end = mid;
+            } else {
+                return mid;
             }
         }
         return start;
