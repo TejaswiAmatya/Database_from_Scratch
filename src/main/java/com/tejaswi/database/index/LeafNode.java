@@ -12,6 +12,11 @@ class LeafNode extends BPlusTreeNode{
         super(maxKeys);
         values = new ArrayList<RecordId>();
     }
+
+    public LeafNode(List<RecordId> values, int maxKeys){
+        super(maxKeys);
+        this.values = values;
+    }
     /**
      * Finds the correct sorted position.
      * Rejects a duplicate key with a meaningful exception.
@@ -78,5 +83,19 @@ class LeafNode extends BPlusTreeNode{
     @Override
     boolean isLeaf() {
         return true;
+    }
+
+    List<RecordId> remove(int startIndex, int endIndex){
+        List<RecordId> result = new ArrayList<RecordId>();
+        if (startIndex > 0 && endIndex < values.size()+1){
+
+            for(int i = startIndex; i < endIndex; i++){
+                result.add(values.get(i));
+            }
+
+            values.remove(result);
+            return result;
+        }
+        return null;
     }
 }

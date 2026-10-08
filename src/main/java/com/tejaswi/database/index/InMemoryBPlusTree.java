@@ -91,7 +91,13 @@ public class InMemoryBPlusTree implements BPlusTree {
      * and use the first key in the right leaf as the separator.
      */
     private LeafSplit splitLeaf(LeafNode leaf) {
-        throw new UnsupportedOperationException("Leaf splitting not implemented");
+        //create a new leaf
+        int seperatorKey = (leaf.size()/2) + 1;
+
+        List<RecordId> rightValues = leaf.remove(seperatorKey, leaf.size());
+        LeafNode rightLeaf = new LeafNode(maxKeysPerNode);
+
+         return new LeafSplit(seperatorKey, rightLeaf);
     }
 
     /** Creates the new root after the old root leaf has split. */
