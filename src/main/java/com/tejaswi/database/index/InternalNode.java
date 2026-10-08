@@ -5,8 +5,7 @@ import java.util.List;
 
 class InternalNode extends BPlusTreeNode{
     private List<BPlusTreeNode> children;
-    private List<Integer> keys;
-    int maxKeys;
+
 
     InternalNode(int maxKeys){
         super(maxKeys);
@@ -55,12 +54,12 @@ class InternalNode extends BPlusTreeNode{
     }
 
     private boolean isOverfull(){
-        return keys.size() <= maxKeys;
+        return keys.size() > maxKeys;
     }
 
     private void insertSeparator(int separatorKey, BPlusTreeNode rightChild){
         int i = findSeparatorInsertIndex(separatorKey);
-        keys.add(separatorKey, i);
+        keys.add(i, separatorKey);
 
          children.add(i+1, rightChild);
     }

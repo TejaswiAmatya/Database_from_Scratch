@@ -1,0 +1,6 @@
+To do:
+- `LeafNode.insert` does not enforce `maxKeys`.
+- Inserting more than the configured capacity silently overflows the leaf.
+- No leaf split, parent creation, internal split, or root replacement occurs.
+- `root` is `final`, so the tree cannot grow beyond its initial leaf.
+- `InternalNode` traversal exists, but insertion never creates or updates internal nodes.

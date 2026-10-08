@@ -5,9 +5,63 @@ import com.tejaswi.database.record.RecordId;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+import java.util.List;
 
 class InMemoryBPlusTreeTest {
+
+	@Test
+	void rejectsNonPositiveMaximumKeyCounts() {
+		assertThrows(IndexOutOfBoundsException.class, () -> new InMemoryBPlusTree(0));
+		assertThrows(IndexOutOfBoundsException.class, () -> new InMemoryBPlusTree(-1));
+	}
+
+	@Test
+	void rejectsDuplicateKeys() {
+		BPlusTree tree = new InMemoryBPlusTree(4);
+		tree.insert(10, new RecordId(100L));
+
+		assertThrows(IllegalArgumentException.class,
+				() -> tree.insert(10, new RecordId(200L)));
+	}
+
+	@Test
+	void rejectsNullRecordIds() {
+		BPlusTree tree = new InMemoryBPlusTree(4);
+
+		assertThrows(NullPointerException.class, () -> tree.insert(10, null));
+	}
+
+	@Test
+	void reportsWhetherAKeyExists() {
+		BPlusTree tree = new InMemoryBPlusTree(4);
+		tree.insert(10, new RecordId(100L));
+
+		assertTrue(tree.containsKey(10));
+		assertFalse(tree.containsKey(99));
+	}
+
+	@Test
+	void rangeScanCurrentlyReturnsTheEmptyScaffoldResult() {
+		BPlusTree tree = new InMemoryBPlusTree(4);
+		tree.insert(10, new RecordId(100L));
+
+		assertEquals(List.of(), tree.rangeScan(1, 20));
+	}
+
+	@Test
+	void deleteCurrentlyLeavesTheScaffoldTreeUnchanged() {
+		BPlusTree tree = new InMemoryBPlusTree(4);
+		tree.insert(10, new RecordId(100L));
+
+		tree.delete(10);
+
+		assertEquals(new RecordId(100L), tree.find(10));
+	}
 
 	@Test
 	void findsRecordIdforInsertedKey() {

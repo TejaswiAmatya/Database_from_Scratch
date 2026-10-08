@@ -71,6 +71,9 @@ class LeafNode extends BPlusTreeNode{
         return start;
     }
 
+    int size(){
+        return values.size();
+    }
 
     @Override
     boolean isLeaf() {

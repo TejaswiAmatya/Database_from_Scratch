@@ -1,0 +1,39 @@
+I checked the actual code, ran build_project, and executed InternalNodeTest — 2 of its 4 tests fail (confirms the bugs below). Here's where the project actually stands against AGENTS.md's phase plan.
+
+Current phase: Phase 2 (in-memory B+ tree) — partially done, with real bugs
+
+What's solid:
+- RecordId (Phase 0/7 model piece) — done, tested, passes.
+- LeafNode — insert/find with sorted binary-search positioning, duplicate-key rejection — done and tested, all tests pass.
+- InMemoryBPlusTree — traversal-based insert/find — works, but only because the tree never actually grows past one leaf (see below).
+
+What's broken in InternalNode (confirmed by failing tests):
+1. Field shadowing bug: InternalNode redeclares private List<Integer> key shadow the inherited protected fields from BPlusTreeNode (DONE). The shadowedkeys is never initialized (stays null), and shadowed maxKeys defaults to 0. Any method written inside InternalNode itself (findChildIndex, isOverfull, insertSeparator,
+   findSeparatorInsertIndex, validateStructure) touches these broken shadeal inherited ones — e.g. findChildIndex will NPE on keys.get(0).
+2. insertSeparator has its List.add args reversed: keys.add(separatorKey, i) should be keys.add(i, separatorKey) (List.add(index, element)). (key)
+3. isOverfull() logic is inverted: keys.size() <= maxKeys should be > (itll" as "not full"). (Done)
+4. Fix: delete the shadow keys/maxKeys fields in InternalNode entirely and use the inherited ones. (Key_
+
+What's missing for Phase 2 to be "done" per AGENTS.md:
+- No leaf split, no root split, no internal-node split — InMemoryBPlusTre leaf and inserts; it never creates an InternalNode or reacts tohasOverflow(). Right now the "tree" is really just one unsplittable leaf (matches the last commit message: "add single-leaf in-memory B+ tree").
+- No leaf sibling links (next/prev pointers) for range scans.
+- No range scan.
+- No randomized differential test vs. TreeMap.
+
+Also notably skipped: Phase 1
+
+AGENTS.md requires Phase 1 (in-memory collection + full scan vs. HashMap rd dataset, duplicate/non-unique tests) before B+ trees. There's no code or test for that anywhere in the repo — the project jumped straight into B+ tree work. Not necessarily fatal, but it's an explicit gap against your own stated plan.
+
+Housekeeping gaps (Phase 0)
+
+- No README.md, no docs/ folder yet (both required by Phase 0 and the documentation requirements section).
+- Stray untitled/ directory (separate throwaway Eclipse project with its evel main/java/ folder outside src/ — leftover clutter worth cleaning up or ignoring.
+- model/, api/, storage/, bitmap/, cache/, query/, util/ packages from thexist yet (expected — later phases).
+
+Suggested next concrete steps
+
+1. Fix the InternalNode field-shadowing/arg-order/inverted-logic bugs so lly.
+2. Decide whether to backfill Phase 1 (full-scan vs. HashMap comparison) or consciously skip it.
+3. Implement leaf split → root split → internal-node split, then sibling ctually finish Phase 2 before moving to Episode 4 (binary node format).
+
+Want me to go ahead and fix the InternalNode bugs now, or would you rathe
