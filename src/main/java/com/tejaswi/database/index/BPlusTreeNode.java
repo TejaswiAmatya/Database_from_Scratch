@@ -5,7 +5,7 @@ import java.util.List;
 
 abstract class BPlusTreeNode {
     protected final int maxKeys;
-    protected final List<Integer> keys;
+    protected List<Integer> keys;
 
     protected BPlusTreeNode(int maxKeys) {
         if(maxKeys <= 0){
@@ -30,7 +30,7 @@ abstract class BPlusTreeNode {
         return keys.size() == maxKeys;
     }
 
-    int keyAt(int index) {
+    Integer keyAt(int index) {
         if (index < 0 || index >= keys.size()){
             throw new IndexOutOfBoundsException();
         }

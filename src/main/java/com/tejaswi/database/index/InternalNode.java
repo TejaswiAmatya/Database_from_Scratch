@@ -1,15 +1,38 @@
 package com.tejaswi.database.index;
 
+import com.tejaswi.database.record.RecordId;
+
 import java.util.ArrayList;
 import java.util.List;
 
 class InternalNode extends BPlusTreeNode{
     private List<BPlusTreeNode> children;
 
-
     InternalNode(int maxKeys){
         super(maxKeys);
         children = new ArrayList<>();
+    }
+
+    InternalNode(
+            int maxKeys,
+            BPlusTreeNode leftChild,
+            int separatorKey,
+            BPlusTreeNode rightChild
+    ) {
+        super(maxKeys);
+
+        if (leftChild == null || rightChild == null) {
+            throw new IllegalArgumentException("Children cannot be null");
+        }
+
+        keys.add(separatorKey);
+        children.add(leftChild);
+        children.add(rightChild);
+    }
+
+    InternalNode(List<Integer> keys, int maxKeys){
+        super(maxKeys);
+        this.keys = keys;
     }
 
     @Override
@@ -57,11 +80,11 @@ class InternalNode extends BPlusTreeNode{
         return keys.size() > maxKeys;
     }
 
-    private void insertSeparator(int separatorKey, BPlusTreeNode rightChild){
+    void insertSeparator(int separatorKey, BPlusTreeNode rightChild){
         int i = findSeparatorInsertIndex(separatorKey);
         keys.add(i, separatorKey);
 
-         children.add(i+1, rightChild);
+       children.add(i+1, rightChild);
     }
 
     private int findSeparatorInsertIndex(int separatorKey){
@@ -88,6 +111,25 @@ class InternalNode extends BPlusTreeNode{
         return start;
 
     }
+
+    List<Integer> remove(int startIndex, int endIndex){
+        List<Integer> result = new ArrayList<Integer>();
+        if (startIndex > 0 && endIndex < keys.size()+1){
+
+            for(int i = startIndex + 1; i < endIndex; i++){
+                result.add(keys.get(i));
+            }
+            keys.remove(startIndex);
+            keys.remove(result);
+            return result;
+        }
+        return null;
+    }
+
+    public int size(){
+        return keys.size();
+    }
+
 
     private void validateStructure() {
         if (keys == null) {

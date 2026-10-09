@@ -2,8 +2,7 @@ package com.tejaswi.database.index;
 
 import com.tejaswi.database.record.RecordId;
 
-import java.util.Objects;
-import java.util.List;
+import java.util.*;
 
 /**
  * Provides an in-memory B+ tree for integer keys and record identifiers.
@@ -32,6 +31,8 @@ public class InMemoryBPlusTree implements BPlusTree {
         this.maxKeysPerNode = maxKeysPerNode;
     }
 
+
+
     /**
      * Inserts a key and its associated record identifier into the tree.
      *
@@ -48,7 +49,8 @@ public class InMemoryBPlusTree implements BPlusTree {
         Objects.requireNonNull(recordId, "recordId cannot be null");
 
         // 1. Find the leaf where this key belongs.
-        LeafNode leaf = findLeafFor(key);
+        Deque<InternalNode> path = new ArrayDeque<>();
+        LeafNode leaf = findLeafFor(key, path);
 
         // 2. Insert in sorted order. A temporary overflow is allowed so the
         //    entries can be divided during the split step below.
@@ -64,24 +66,13 @@ public class InMemoryBPlusTree implements BPlusTree {
 
         // 5. A root split creates a new internal root.
         if (leaf == root) {
-            root = createNewRoot(leaf, split.separatorKey(), split.rightLeaf());
+            createNewRoot(leaf, split.separatorKey(), split.rightLeaf());
             return;
         }
 
         // 6. Otherwise, add the new right child to the existing parent.
         //    Parent overflow must be propagated upward by this method.
-        insertIntoParent(leaf, split.separatorKey(), split.rightLeaf());
-    }
-
-    /** Returns the leaf where {@code key} should be inserted. */
-    private LeafNode findLeafFor(int key) {
-        BPlusTreeNode current = root;
-
-        while (!current.isLeaf()) {
-            current = ((InternalNode) current).childFor(key);
-        }
-
-        return (LeafNode) current;
+        insertIntoParent(leaf, split.separatorKey(), split.rightLeaf(), path);
     }
 
     /**
@@ -92,33 +83,82 @@ public class InMemoryBPlusTree implements BPlusTree {
      */
     private LeafSplit splitLeaf(LeafNode leaf) {
         //create a new leaf
-        int seperatorKey = (leaf.size()/2) + 1;
-
+        int seperatorKeyIndex = (leaf.size()/2) + 1;
+        Integer seperatorKey = leaf.keyAt(seperatorKeyIndex);
         List<RecordId> rightValues = leaf.remove(seperatorKey, leaf.size());
-        LeafNode rightLeaf = new LeafNode(maxKeysPerNode);
+        LeafNode rightLeaf = new LeafNode(rightValues, maxKeysPerNode);
 
          return new LeafSplit(seperatorKey, rightLeaf);
     }
 
     /** Creates the new root after the old root leaf has split. */
-    private BPlusTreeNode createNewRoot(
+    private void createNewRoot(
             BPlusTreeNode leftChild,
             int separatorKey,
             BPlusTreeNode rightChild
     ) {
-        // TODO: create an InternalNode with two children and one separator.
-        throw new UnsupportedOperationException("Root splitting not implemented");
+        root = new InternalNode(
+                maxKeysPerNode,
+                leftChild,
+                separatorKey,
+                rightChild
+        );
+    }
+
+    /** Finding leaf for the key **/
+    private LeafNode findLeafFor(int key, Deque<InternalNode> path){
+            BPlusTreeNode current = root;
+
+            while (!current.isLeaf()) {
+                InternalNode internal = (InternalNode) current;
+                path.push(internal);
+                current = internal.childFor(key);
+            }
+
+            return (LeafNode) current;
     }
 
     /** Adds a separator and right child to the existing parent. */
     private void insertIntoParent(
             BPlusTreeNode leftChild,
-            int separatorKey,
-            BPlusTreeNode rightChild
+            Integer separatorKey,
+            BPlusTreeNode rightChild,
+            Deque<InternalNode> path
     ) {
-        // TODO: locate the parent, insert the separator and child, then split
-        //       and propagate if the internal node overflows.
-        throw new UnsupportedOperationException("Parent insertion not implemented");
+        if (path.isEmpty()) {
+//            throw new IllegalStateException(
+//                    "Cannot insert into a parent because the path is empty."
+//            );
+            return;
+        }
+
+        InternalNode parent = path.pop();
+        parent.insertSeparator(separatorKey, rightChild);
+
+        if (!parent.hasOverflow()) {
+            return;
+        }
+
+        // Internal-node splitting and propagation will be added next.
+        InternalSplit split = internalNodeSplit(parent);
+        insertIntoParent(parent, split.separatorKey, split.rightNode(), path);
+
+    }
+
+    private record InternalSplit(
+            int separatorKey,
+            InternalNode rightNode
+    ) {
+    }
+    private InternalSplit internalNodeSplit(InternalNode node){
+
+        //create a new leaf
+        int seperatorKeyIndex = (node.size()/2) + 1;
+        Integer seperatorKey = node.keyAt(seperatorKeyIndex);
+        List<Integer> rightKeys = node.remove(seperatorKeyIndex, node.size());
+        InternalNode rightNode = new InternalNode(rightKeys, maxKeysPerNode);
+
+        return new InternalSplit(seperatorKey, rightNode);
     }
 
     /** Result returned by a leaf split. */

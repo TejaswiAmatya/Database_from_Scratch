@@ -8,12 +8,12 @@ import java.util.List;
 class LeafNode extends BPlusTreeNode{
     private final List<RecordId> values;
 
-    public LeafNode(int maxKeys){
+    LeafNode(int maxKeys){
         super(maxKeys);
         values = new ArrayList<RecordId>();
     }
 
-    public LeafNode(List<RecordId> values, int maxKeys){
+    LeafNode(List<RecordId> values, int maxKeys){
         super(maxKeys);
         this.values = values;
     }
