@@ -1,0 +1,15 @@
+These classes do not appear to exist yet:
+
+com.tejaswi.database.model.Document
+com.tejaswi.database.collection.InMemoryCollection
+com.tejaswi.database.index.HashMapIndex
+
+You need to demonstrate:
+
+- In-memory records stored in a Map
+- Full-scan lookup
+- Simple HashMap index lookup
+- Duplicate-value behavior
+- Non-unique-value behavior
+- Identical results from full scan and indexed lookup
+- A test dataset of at least 10,000 records

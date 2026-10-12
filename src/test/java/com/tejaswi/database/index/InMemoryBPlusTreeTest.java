@@ -27,6 +27,8 @@ class InMemoryBPlusTreeTest {
 
 		assertThrows(IllegalArgumentException.class,
 				() -> tree.insert(10, new RecordId(200L)));
+		assertEquals(1, tree.size());
+		assertEquals(new RecordId(100L), tree.search(10));
 	}
 
 	@Test
@@ -34,6 +36,8 @@ class InMemoryBPlusTreeTest {
 		BPlusTree tree = new InMemoryBPlusTree(4);
 
 		assertThrows(NullPointerException.class, () -> tree.insert(10, null));
+		assertTrue(tree.isEmpty());
+		assertEquals(0, tree.size());
 	}
 
 	@Test
@@ -46,11 +50,58 @@ class InMemoryBPlusTreeTest {
 	}
 
 	@Test
-	void rangeScanCurrentlyReturnsTheEmptyScaffoldResult() {
+	void rangeScanReturnsMatchingValuesFromOneLeaf() {
 		BPlusTree tree = new InMemoryBPlusTree(4);
 		tree.insert(10, new RecordId(100L));
+		tree.insert(20, new RecordId(200L));
+		tree.insert(30, new RecordId(300L));
 
-		assertEquals(List.of(), tree.rangeScan(1, 20));
+		assertEquals(
+				List.of(new RecordId(100L), new RecordId(200L)),
+				tree.rangeScan(1, 20)
+		);
+	}
+
+	@Test
+	void rangeScanFollowsLeafLinksInKeyOrder() {
+		BPlusTree tree = new InMemoryBPlusTree(2);
+
+		for (int key = 1; key <= 10; key++) {
+			tree.insert(key, new RecordId(key * 10L));
+		}
+
+		assertEquals(
+				List.of(
+						new RecordId(30L),
+						new RecordId(40L),
+						new RecordId(50L),
+						new RecordId(60L),
+						new RecordId(70L)
+				),
+				tree.rangeScan(3, 7)
+		);
+	}
+
+	@Test
+	void rangeScanIncludesBothBounds() {
+		BPlusTree tree = new InMemoryBPlusTree(3);
+		tree.insert(-10, new RecordId(1L));
+		tree.insert(0, new RecordId(2L));
+		tree.insert(10, new RecordId(3L));
+
+		assertEquals(
+				List.of(new RecordId(2L), new RecordId(3L)),
+				tree.rangeScan(0, 10)
+		);
+	}
+
+	@Test
+	void rangeScanReturnsEmptyForNoMatchesOrReversedBounds() {
+		BPlusTree tree = new InMemoryBPlusTree(3);
+		tree.insert(10, new RecordId(100L));
+
+		assertEquals(List.of(), tree.rangeScan(11, 20));
+		assertEquals(List.of(), tree.rangeScan(20, 11));
 	}
 
 	@Test
@@ -60,7 +111,7 @@ class InMemoryBPlusTreeTest {
 
 		tree.delete(10);
 
-		assertEquals(new RecordId(100L), tree.find(10));
+		assertEquals(new RecordId(100L), tree.search(10));
 	}
 
 	@Test
@@ -71,9 +122,86 @@ class InMemoryBPlusTreeTest {
         tree.insert(25, new RecordId(250L));
         tree.insert(90, new RecordId(900L));
 
-        assertEquals(new RecordId(100L), tree.find(10));
-        assertEquals(new RecordId(250L), tree.find(25));
-        assertEquals(new RecordId(900L), tree.find(90));
+        assertEquals(new RecordId(100L), tree.search(10));
+        assertEquals(new RecordId(250L), tree.search(25));
+        assertEquals(new RecordId(900L), tree.search(90));
+	}
+
+	@Test
+	void insertsKeysIntoOneLeafAndTracksTreeState() {
+		BPlusTree tree = new InMemoryBPlusTree(4);
+
+		tree.insert(50, new RecordId(500L));
+		tree.insert(-10, new RecordId(10L));
+		tree.insert(0, new RecordId(0L));
+		tree.insert(Integer.MAX_VALUE, new RecordId(2L));
+
+		assertEquals(4, tree.size());
+		assertFalse(tree.isEmpty());
+		assertEquals(new RecordId(10L), tree.search(-10));
+		assertEquals(new RecordId(0L), tree.search(0));
+		assertEquals(new RecordId(500L), tree.search(50));
+		assertEquals(new RecordId(2L), tree.search(Integer.MAX_VALUE));
+	}
+
+	@Test
+	void leafSplitPreservesEveryEntryAndRoutesSeparatorKeysCorrectly() {
+		BPlusTree tree = new InMemoryBPlusTree(3);
+
+		for (int key = 1; key <= 20; key++) {
+			tree.insert(key, new RecordId(key * 10L));
+		}
+
+		assertEquals(20, tree.size());
+		for (int key = 1; key <= 20; key++) {
+			assertEquals(new RecordId(key * 10L), tree.search(key));
+		}
+		assertNull(tree.search(0));
+		assertNull(tree.search(21));
+	}
+
+	@Test
+	void multipleInternalSplitsPreserveEveryEntry() {
+		BPlusTree tree = new InMemoryBPlusTree(2);
+
+		for (int key = 100; key >= 1; key--) {
+			tree.insert(key, new RecordId(key));
+		}
+
+		assertEquals(100, tree.size());
+		for (int key = 1; key <= 100; key++) {
+			assertEquals(new RecordId(key), tree.search(key));
+		}
+	}
+
+	@Test
+	void supportsTheSmallestPositiveNodeCapacity() {
+		BPlusTree tree = new InMemoryBPlusTree(1);
+
+		for (int key = 0; key < 12; key++) {
+			tree.insert(key, new RecordId(key));
+		}
+
+		assertEquals(12, tree.size());
+		for (int key = 0; key < 12; key++) {
+			assertEquals(new RecordId(key), tree.search(key));
+		}
+	}
+
+	@Test
+	void clearRemovesAllInsertedEntriesAndAllowsReuse() {
+		BPlusTree tree = new InMemoryBPlusTree(2);
+		tree.insert(1, new RecordId(1));
+		tree.insert(2, new RecordId(2));
+		tree.insert(3, new RecordId(3));
+
+		tree.clear();
+
+		assertTrue(tree.isEmpty());
+		assertEquals(0, tree.size());
+		assertNull(tree.search(1));
+		tree.insert(4, new RecordId(4));
+		assertEquals(new RecordId(4), tree.search(4));
 	}
 	
 	@Test
@@ -82,7 +210,7 @@ class InMemoryBPlusTreeTest {
 
         tree.insert(10, new RecordId(100L));
 
-        assertNull(tree.find(99));
+        assertNull(tree.search(99));
     }
 
     @Test
@@ -93,9 +221,9 @@ class InMemoryBPlusTreeTest {
         tree.insert(10, new RecordId(100L));
         tree.insert(30, new RecordId(300L));
 
-        assertEquals(new RecordId(100L), tree.find(10));
-        assertEquals(new RecordId(300L), tree.find(30));
-        assertEquals(new RecordId(500L), tree.find(50));
+        assertEquals(new RecordId(100L), tree.search(10));
+        assertEquals(new RecordId(300L), tree.search(30));
+        assertEquals(new RecordId(500L), tree.search(50));
     }
 
 }

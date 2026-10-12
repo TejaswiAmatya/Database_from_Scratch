@@ -1,7 +1,5 @@
 package com.tejaswi.database.index;
 
-import com.tejaswi.database.record.RecordId;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +18,7 @@ class InternalNode extends BPlusTreeNode{
             BPlusTreeNode rightChild
     ) {
         super(maxKeys);
+        children = new ArrayList<>();
 
         if (leftChild == null || rightChild == null) {
             throw new IllegalArgumentException("Children cannot be null");
@@ -30,9 +29,13 @@ class InternalNode extends BPlusTreeNode{
         children.add(rightChild);
     }
 
-    InternalNode(List<Integer> keys, int maxKeys){
+    InternalNode(List<Integer> keys, List<BPlusTreeNode> children, int maxKeys) {
         super(maxKeys);
-        this.keys = keys;
+        if (children.size() != keys.size() + 1) {
+            throw new IllegalArgumentException("An internal node needs one more child than key");
+        }
+        this.keys = new ArrayList<>(keys);
+        this.children = new ArrayList<>(children);
     }
 
     @Override
@@ -44,6 +47,9 @@ class InternalNode extends BPlusTreeNode{
      * Given a key, determine which children does the key belong to
      * **/
     private int findChildIndex(int key){
+        if (keys.isEmpty()) {
+            return 0;
+        }
         if (key < keys.get(0)){
             return 0;
         } else if (key > keys.get(keys.size()-1)) {
@@ -112,18 +118,8 @@ class InternalNode extends BPlusTreeNode{
 
     }
 
-    List<Integer> remove(int startIndex, int endIndex){
-        List<Integer> result = new ArrayList<Integer>();
-        if (startIndex > 0 && endIndex < keys.size()+1){
-
-            for(int i = startIndex + 1; i < endIndex; i++){
-                result.add(keys.get(i));
-            }
-            keys.remove(startIndex);
-            keys.remove(result);
-            return result;
-        }
-        return null;
+    List<BPlusTreeNode> children() {
+        return children;
     }
 
     public int size(){

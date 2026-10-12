@@ -45,8 +45,19 @@ public interface BPlusTree {
      */
     boolean containsKey(int key);
 
+    /**
+     * Returns the number of keys currently stored in the tree.
+     */
     int size();
+
+    /**
+     * Returns whether the tree contains no keys.
+     */
     boolean isEmpty();
+
+    /**
+     * Removes all keys from the tree and restores an empty root leaf.
+     */
     void clear();
 
 }
