@@ -105,16 +105,6 @@ class InMemoryBPlusTreeTest {
 	}
 
 	@Test
-	void deleteCurrentlyLeavesTheScaffoldTreeUnchanged() {
-		BPlusTree tree = new InMemoryBPlusTree(4);
-		tree.insert(10, new RecordId(100L));
-
-		tree.delete(10);
-
-		assertEquals(new RecordId(100L), tree.search(10));
-	}
-
-	@Test
 	void findsRecordIdforInsertedKey() {
 		BPlusTree tree = new InMemoryBPlusTree(4);
 
