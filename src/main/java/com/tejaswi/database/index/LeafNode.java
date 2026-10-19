@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Objects;
 
 class LeafNode extends BPlusTreeNode{
+    record LeafEntry(int key, RecordId recordId) {}
+
     private final List<RecordId> values;
     private LeafNode nextLeaf;
 
@@ -94,6 +96,47 @@ class LeafNode extends BPlusTreeNode{
 
     int size(){
         return values.size();
+    }
+
+    /** Removes the value associated with an existing key. */
+    void deleteKey(int key) {
+        int index = findInsertPosition(key);
+        if (index >= keys.size() || keys.get(index) != key) {
+            throw new IllegalArgumentException("Key does not exist: " + key);
+        }
+
+        keys.remove(index);
+        values.remove(index);
+    }
+
+    LeafEntry removeFirstEntry() {
+        if (keys.isEmpty()) {
+            throw new IllegalStateException("Cannot remove from an empty leaf");
+        }
+
+        return new LeafEntry(
+                keys.removeFirst(),
+                values.removeFirst()
+        );
+    }
+
+    LeafEntry removeLastEntry() {
+        if (keys.isEmpty()) {
+            throw new IllegalStateException("Cannot remove from an empty leaf");
+        }
+
+        return new LeafEntry(
+                keys.removeLast(),
+                values.removeLast()
+        );
+    }
+
+    /** Appends all entries from the right leaf and preserves the leaf chain. */
+    void appendEntriesFrom(LeafNode rightLeaf) {
+        Objects.requireNonNull(rightLeaf, "rightLeaf cannot be null");
+        keys.addAll(rightLeaf.keys);
+        values.addAll(rightLeaf.values);
+        nextLeaf = rightLeaf.nextLeaf;
     }
 
     @Override

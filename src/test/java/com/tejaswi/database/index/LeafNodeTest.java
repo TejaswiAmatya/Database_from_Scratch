@@ -136,4 +136,24 @@ class LeafNodeTest {
         assertThrows(IndexOutOfBoundsException.class, () -> node.remove(1, 1));
         assertThrows(IndexOutOfBoundsException.class, () -> node.remove(0, 2));
     }
+
+    @Test
+    void removesTheFirstKeyAndRecordIdAsAnEntry() {
+        LeafNode node = new LeafNode(3);
+        node.insert(10, new RecordId(100L));
+        node.insert(20, new RecordId(200L));
+
+        LeafNode.LeafEntry entry = node.removeFirstEntry();
+
+        assertEquals(new LeafNode.LeafEntry(10, new RecordId(100L)), entry);
+        assertEquals(List.of(20), node.keys);
+        assertEquals(new RecordId(200L), node.find(20));
+    }
+
+    @Test
+    void rejectsRemovingTheFirstEntryFromAnEmptyLeaf() {
+        LeafNode node = new LeafNode(3);
+
+        assertThrows(IllegalStateException.class, node::removeFirstEntry);
+    }
 }

@@ -64,6 +64,32 @@ class InMemoryBPlusTreeTest {
 	}
 
 	@Test
+	void ignoresDeletingAMissingKey() {
+		BPlusTree tree = new InMemoryBPlusTree(4);
+		tree.insert(10, new RecordId(100L));
+
+		tree.delete(99);
+
+		assertEquals(1, tree.size());
+		assertEquals(new RecordId(100L), tree.search(10));
+	}
+
+	@Test
+	void updatesAnInternalSeparatorWhenItsLeafKeyIsDeleted() {
+		BPlusTree tree = new InMemoryBPlusTree(2);
+		for (int key = 1; key <= 5; key++) {
+			tree.insert(key, new RecordId(key));
+		}
+
+		tree.delete(3);
+
+		assertNull(tree.search(3));
+		assertEquals(new RecordId(4), tree.search(4));
+		assertEquals(new RecordId(5), tree.search(5));
+		assertEquals(4, tree.size());
+	}
+
+	@Test
 	void rangeScanReturnsMatchingValuesFromOneLeaf() {
 		BPlusTree tree = new InMemoryBPlusTree(4);
 		tree.insert(10, new RecordId(100L));

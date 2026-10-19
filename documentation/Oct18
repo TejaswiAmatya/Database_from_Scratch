@@ -1,3 +1,150 @@
 https://www.youtube.com/watch?v=pGOdeCpuwpI
 
 Writing deletion method according to this
+
+### 1. Find the target leaf
+
+Traverse from the root while recording each parent and child position:
+
+root → internal parent → internal parent → target leaf
+
+Use a path entry such as:
+
+record ParentEntry(InternalNode parent, int childIndex) {}
+
+Recording childIndex makes sibling lookup easier later.
+
+### 2. Handle a missing key
+
+Search the leaf first.
+
+If key does not exist:
+    return
+
+Do not modify the tree or size.
+
+### 3. Remove the key and value together
+
+The leaf must remove both:
+
+key
+RecordId
+
+Never remove only the key, or the key/value lists become misaligned.
+
+Decrement size exactly once.
+
+### 4. Handle the root leaf
+
+If the root is a leaf, deletion is complete. The root is allowed to contain fewer keys than normal nodes, including zero keys.
+
+### 5. Update separator keys
+
+Internal keys are routing separators, not independent records.
+
+If the deleted key was the first key of a right-hand child:
+
+old child: [10, 20]
+separator: 10
+
+after deleting 10:
+child: [20]
+separator must become 20
+
+Do not remove the separator unless a child is merged. Replace it with the child’s new first key.
+
+### 6. Check for leaf underflow
+
+Define minimum occupancy separately:
+
+minimum leaf keys = ceil(maxKeys / 2)
+minimum internal children = ceil((maxKeys + 1) / 2)
+minimum internal keys = minimum internal children - 1
+
+The root is a special case and may be below these minimums.
+
+If the leaf still has enough keys, stop.
+
+### 7. Borrow from a sibling
+
+Try the left or right sibling before merging.
+
+Borrow from the left:
+
+left sibling's largest entry → current leaf's front
+parent separator → current leaf's new first key
+
+Borrow from the right:
+
+right sibling's smallest entry → current leaf's end
+parent separator → right sibling's new first key
+
+Update leaf links only when merging, not when borrowing.
+
+### 8. Merge leaves if borrowing is impossible
+
+Merge with an adjacent sibling:
+
+left leaf + right leaf
+
+Then:
+
+- Connect the merged leaf to the next leaf.
+- Remove the right child from the parent.
+- Remove the separator between them from the parent.
+- Check whether the parent now underflows.
+
+### 9. Rebalance internal nodes
+
+If an internal parent underflows, apply the same process recursively:
+
+1. Borrow a child pointer from a sibling if possible.
+2. Rotate the parent separator appropriately.
+3. Otherwise merge two internal nodes.
+4. Remove the corresponding separator from their parent.
+5. Continue upward.
+
+Internal-node borrowing rotates both:
+
+separator key
+child pointer
+
+Do not treat internal keys like leaf records.
+
+### 10. Shrink the root
+
+If the root is an internal node with zero keys and one child:
+
+root = root.children().get(0)
+
+This reduces the tree height by one.
+
+## Recommended implementation order
+
+Implement and test these milestones separately:
+
+1. Delete from a leaf with no underflow.
+2. Update a changed separator.
+3. Borrow from the left sibling.
+4. Borrow from the right sibling.
+5. Merge leaves.
+6. Propagate parent underflow.
+7. Borrow and merge internal nodes.
+8. Shrink the root.
+
+Your current implementation is between steps 1 and 2. It should not silently refuse deletion when a leaf reaches minimum occupancy; that condition should eventually trigger borrowing or merging.
+
+Recommended tests:
+
+- Delete an existing key from a single leaf.
+- Delete a missing key.
+- Delete the first key of a right leaf and verify separator updates.
+- Borrow from the left sibling.
+- Borrow from the right sibling.
+- Merge two leaves.
+- Delete until the root shrinks.
+- Delete keys in randomized order and compare results with TreeMap.
+
+The relevant playlist milestone is Episode 11, which your project notes identify as the B+ tree deletion algorithm. A suitable commit after the first no-underflow milestone would be:
+
+feat(index): delete leaf entries and update separators
