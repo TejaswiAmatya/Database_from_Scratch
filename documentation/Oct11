@@ -1,15 +1,285 @@
-These classes do not appear to exist yet:
+# Oct 11 — Phase 1: Full Scan and In-Memory HashMap Index
 
-com.tejaswi.database.model.Document
-com.tejaswi.database.collection.InMemoryCollection
-com.tejaswi.database.index.HashMapIndex
+This is the Phase 1 milestone that was skipped when the project moved ahead to
+the in-memory B+ tree. The purpose is to understand why an index is useful
+before implementing a more complicated tree or disk format.
 
-You need to demonstrate:
+This milestone is entirely in memory. Do not add files, `FileChannel`, binary
+serialization, caching, locking, or B+ tree code here.
 
-- In-memory records stored in a Map
-- Full-scan lookup
-- Simple HashMap index lookup
-- Duplicate-value behavior
-- Non-unique-value behavior
-- Identical results from full scan and indexed lookup
-- A test dataset of at least 10,000 records
+## Current status
+
+These classes do not exist yet:
+
+```text
+src/main/java/com/tejaswi/database/model/Document.java
+src/main/java/com/tejaswi/database/collection/InMemoryCollection.java
+src/main/java/com/tejaswi/database/index/HashMapIndex.java
+```
+
+The existing `RecordId` class is at:
+
+```text
+src/main/java/com/tejaswi/database/record/RecordId.java
+```
+
+Use the package names above unless there is a strong reason to change them.
+
+## What you are building
+
+Build a small collection that can find records in two ways:
+
+1. **Full scan:** inspect every stored record and keep records whose field has
+   the requested value.
+2. **HashMap index lookup:** use a `HashMap` to jump from a field value to the
+   matching record IDs, then retrieve those records from the collection.
+
+Both methods must return the same logical records. The full scan checks every
+record; the index narrows the search using a map.
+
+Example:
+
+```text
+Records:
+Record 1: {id: 1, name: "Ana", department: "CS"}
+Record 2: {id: 2, name: "Bo",  department: "Math"}
+Record 3: {id: 3, name: "Cy",  department: "CS"}
+
+Index on "department":
+"CS"   -> [Record 1, Record 3]
+"Math" -> [Record 2]
+```
+
+A query for `department = "CS"` must return Records 1 and 3 using either
+approach.
+
+## Class 1: `Document`
+
+Create:
+
+```text
+src/main/java/com/tejaswi/database/model/Document.java
+```
+
+Responsibility: represent one simple record as field names and values. Use an
+immutable wrapper around `Map<String, Object>`. Initially support `String`,
+`Integer`, `Long`, and `Boolean`.
+
+It should be possible to:
+
+- create a document from field/value pairs or a map;
+- read a field by name;
+- check whether a field exists;
+- reject a null or empty field name;
+- avoid exposing a mutable internal map;
+- compare equivalent documents using `equals` and `hashCode`.
+
+Example:
+
+```java
+Document student = Document.of(
+    "id", 1,
+    "name", "Tejaswi",
+    "department", "CS",
+    "active", true
+);
+```
+
+Do not implement nested documents, arrays, persistence, updates, or a query
+language yet.
+
+## Class 2: `InMemoryCollection`
+
+Create:
+
+```text
+src/main/java/com/tejaswi/database/collection/InMemoryCollection.java
+```
+
+Responsibility: own the records and provide the correctness baseline.
+
+Store records in a map:
+
+```java
+Map<RecordId, Document> records;
+```
+
+Provide behavior equivalent to:
+
+- `insert(Document document)` — create an ID, store the document, and return
+  the ID;
+- `get(RecordId id)` — retrieve a document, preferably as `Optional<Document>`;
+- `fullScan(String fieldName, Object expectedValue)` — inspect every record and
+  return all matching records or IDs;
+- a way for the index to retrieve a document by `RecordId`.
+
+Generated IDs only need to be unique during this in-memory milestone. A
+sequential ID is sufficient if it matches the existing `RecordId` design.
+
+The full scan is the reference implementation. It must not call
+`HashMapIndex`, or the comparison would not prove anything.
+
+## Class 3: `HashMapIndex`
+
+Create:
+
+```text
+src/main/java/com/tejaswi/database/index/HashMapIndex.java
+```
+
+Responsibility: map one document field value to every `RecordId` containing
+that value.
+
+The structure should conceptually be:
+
+```text
+field value -> set/list of RecordId values
+```
+
+For example:
+
+```text
+"CS"   -> [RecordId(1), RecordId(3)]
+"Math" -> [RecordId(2)]
+```
+
+The index must support non-unique values. Do not use `Map<Object, RecordId>`,
+because that would overwrite earlier records. Use a collection of IDs, such
+as `Map<Object, Set<RecordId>>`.
+
+Provide behavior equivalent to:
+
+- construct an index for one field name;
+- add a document's field value and `RecordId`;
+- look up all IDs for a value;
+- return no IDs for an unknown value;
+- prevent one `RecordId` from appearing twice for one value;
+- optionally remove an ID, even though deletion is not required yet.
+
+If a document lacks the indexed field, choose and document one consistent
+behavior. Skipping that document is the simplest choice.
+
+The index should store IDs, not complete documents. The collection remains
+responsible for storing and retrieving documents.
+
+## Duplicate and non-unique values
+
+Several different records may have the same value:
+
+```text
+Record 1: department = "CS"
+Record 2: department = "CS"
+Record 3: department = "Math"
+```
+
+Looking up `department = "CS"` must return both Record 1 and Record 2. This is
+a non-unique index.
+
+There is a separate rule for accidentally adding the same record twice: a
+lookup must still return that ID once. A `Set<RecordId>` naturally enforces
+this.
+
+This milestone does **not** require a unique index that rejects duplicate field
+values. Unique-index behavior belongs to a later phase.
+
+## Required tests
+
+Add tests under `src/test/java`, mirroring the production packages.
+
+### `DocumentTest`
+
+Test that a document stores and returns fields, supports the initial value
+types, handles missing fields consistently, rejects invalid field names, and
+compares equivalent documents correctly.
+
+### `InMemoryCollectionTest`
+
+Test that insertion returns an ID, retrieval by ID works, IDs are different for
+two inserts, full scan finds all matches, full scan returns nothing for no
+match, and a missing requested field does not match.
+
+### `HashMapIndexTest`
+
+Test one ID per value, several IDs per value, unknown values, duplicate adds of
+the same ID, and the documented behavior for missing indexed fields.
+
+### Comparison/integration test
+
+Insert the same records into an `InMemoryCollection` and a `HashMapIndex`, then
+compare:
+
+```text
+collection.fullScan("department", "CS")
+versus
+collection.get(...) for every ID from index.lookup("CS")
+```
+
+Compare IDs or normalized documents as sets when ordering is not part of the
+API. The result must contain exactly the same records, with no missing or
+duplicated records.
+
+## Required 10,000-record experiment
+
+Create at least 10,000 deterministic records, for example by assigning each
+record one of `CS`, `Math`, or `Physics` in a loop.
+
+For every record:
+
+1. Insert it into the collection.
+2. Add its field value and returned ID to the index.
+3. Run a full scan for one value.
+4. Run the indexed lookup for that same value.
+5. Retrieve indexed IDs from the collection.
+6. Compare the two result sets.
+
+This test must prove correctness, not claim a precise performance number.
+Timing is affected by JVM warm-up, allocations, and machine load.
+
+## Definition of done
+
+- The three classes exist at the paths above.
+- Records are stored in `Map<RecordId, Document>`.
+- Full scan works without using the index.
+- HashMap lookup returns every matching ID.
+- Non-unique values are supported.
+- Adding the same record twice does not duplicate results.
+- Missing values return an empty result or the documented equivalent.
+- Full-scan and indexed lookups produce identical result sets.
+- The comparison test uses at least 10,000 records.
+- All JUnit tests pass.
+- No persistence or B+ tree functionality is added in this milestone.
+- The implementation protects these invariants: records remain retrievable by
+  ID, non-unique indexes return every matching ID exactly once, and the index
+  does not silently replace one matching record with another.
+
+## How to run in Eclipse
+
+1. Refresh the project so Eclipse sees the new source files.
+2. Confirm the project uses Java 21 and JUnit 5.
+3. Run the test source folder or the relevant classes as **JUnit Test**.
+4. Confirm the 10,000-record comparison test passes.
+
+The tests are the required proof. A small `Main` demonstration is optional.
+
+## Common mistakes
+
+- Using `Map<Object, RecordId>` and losing all but the last duplicate value.
+- Returning index IDs without retrieving/checking the records in the collection.
+- Implementing `fullScan` by calling the index.
+- Comparing lists when ordering is not guaranteed; compare sets instead.
+- Exposing a mutable internal map or set.
+- Forgetting to index every inserted record in test setup.
+- Adding unique-index rejection rules to this non-unique milestone.
+
+## Suggested commit
+
+After the tests pass:
+
+```text
+feat(index): compare full scan and in-memory index lookup
+```
+
+Only after this milestone is understood and passing should you continue with
+the remaining in-memory B+ tree work: leaf splitting, root splitting,
+internal-node splitting, leaf links, range scans, and randomized comparison
+with `TreeMap`.

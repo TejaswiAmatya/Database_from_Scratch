@@ -1,0 +1,138 @@
+Watched the video
+Notes from Episode 4:
+- Binary Representation
+1. Internal Node and Leaf Node
+
+Binary Pointer Representation
+1. Type
+a. Data (by leaf)
+b. Another Node (by Internal Node)
+
+Divided into 13 byte
+1 byte = type
+8 byte = Position
+4 byte = Chunk
+
+The video has used byte representation for nodes. I have created objects
+
+Yes, I looked at it. It is Episode 4, “B+Tree node binary representation.” It explains representing node type, root flags, keys, and pointers as binary data so nodes can eventually be stored on disk. YouTube video (https://www.youtube.com/watch?v=bRjAglcPb_c)
+
+You should not replace your current object-based B+ tree yet.
+
+Your current implementation is useful for learning and testing the tree algorithms:
+
+BPlusTreeNode
+├── keys
+├── LeafNode
+└── InternalNode
+
+Object representation is easier to debug and is appropriate for:
+
+- searching;
+- inserting;
+- splitting leaves;
+- splitting internal nodes;
+- root replacement;
+- range scans;
+- testing tree invariants.
+
+Byte representation becomes necessary when you want persistence. A database cannot safely save Java object references such as:
+
+LeafNode nextLeaf;
+List<Integer> keys;
+
+Those references only make sense inside the current JVM. Instead, a persisted node needs data such as:
+
+node type
+number of keys
+keys
+record IDs or child offsets
+next-leaf offset
+
+The best architecture for your project is hybrid:
+
+Disk:
+4096 bytes
+    ↓ deserialize
+Java object node
+    ↓ modify
+Java object node
+    ↓ serialize
+4096 bytes on disk
+
+So your eventual design should have classes similar to:
+
+LeafNode              // in-memory logical representation
+InternalNode          // in-memory logical representation
+NodeSerializer        // converts objects ↔ ByteBuffer
+IndexStorageManager   // reads/writes serialized nodes
+
+Do not put ByteBuffer logic directly into every B+ tree algorithm. Keep the tree algorithms working with LeafNode and InternalNode, then add serialization around them.
+
+One important note: your current code is not yet a persistent B+ tree. It still has delete() as a TODO, and nodes contain Java references rather than disk offsets. That is fine for the current in-memory phase.
+
+Recommended next step:
+
+1. Finish and test the in-memory B+ tree.
+2. Define a fixed 4096-byte node format.
+3. Implement NodeSerializer.
+4. Test serialize → deserialize equality.
+5. Only then connect nodes to an index file.
+
+So the answer is: byte representation is better for the final disk-backed database, but object representation is better for your current algorithm-development stage. Do not rewrite everything; add serialization as the next layer.
+
+
+
+For B+ tree, I still need:
+
+1. Implement deletion
+
+InMemoryBPlusTree.delete(int key) currently does nothing:
+You still need:
+
+- remove a key from a leaf;
+- borrow from a left/right sibling;
+- merge underfull leaves;
+- update parent separator keys;
+- handle internal-node underflow;
+- shrink the root when necessary;
+- update size;
+- preserve leaf links.
+
+This is the largest remaining B+ tree algorithm.
+
+2. Add a previous-leaf link
+
+Your leaves currently only contain:
+
+private LeafNode nextLeaf;
+
+For forward range scans, nextLeaf is enough. However, your project notes mention sibling links, and a complete implementation can also add:
+
+private LeafNode previousLeaf;
+
+This becomes useful for reverse scans and deletion rebalancing.
+
+3. Add a tree integrity verifier
+
+You have some internal validation code, but there is no public tree-level verifier that checks:
+
+- keys are sorted;
+- every internal node has the correct number of children;
+- all leaves are at the same depth;
+- parent separators route keys correctly;
+- leaf links are ordered and complete;
+- no entries are lost or duplicated.
+
+This is strongly recommended before moving to disk storage.
+
+4. Add more structural tests
+
+Your existing tests cover insertion, leaf splits, internal splits, root replacement, range scans, and randomized insertion/search. Add tests for:
+
+- exact leaf boundaries after splits;
+- root structure after the first split;
+- multiple levels of internal nodes;
+- leaf-link ordering;
+- negative and boundary keys after many splits;
+- structural verification after randomized inserts.

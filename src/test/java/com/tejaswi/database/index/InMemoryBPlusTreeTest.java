@@ -50,6 +50,20 @@ class InMemoryBPlusTreeTest {
 	}
 
 	@Test
+	void deletesAnExistingKey() {
+		BPlusTree tree = new InMemoryBPlusTree(4);
+		tree.insert(10, new RecordId(100L));
+		tree.insert(20, new RecordId(200L));
+
+		tree.delete(10);
+
+		assertNull(tree.search(10));
+		assertFalse(tree.containsKey(10));
+		assertEquals(1, tree.size());
+		assertEquals(new RecordId(200L), tree.search(20));
+	}
+
+	@Test
 	void rangeScanReturnsMatchingValuesFromOneLeaf() {
 		BPlusTree tree = new InMemoryBPlusTree(4);
 		tree.insert(10, new RecordId(100L));

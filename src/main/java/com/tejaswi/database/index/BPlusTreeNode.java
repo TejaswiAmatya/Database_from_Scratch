@@ -13,8 +13,9 @@ abstract class BPlusTreeNode {
         }
         this.maxKeys = maxKeys;
         keys = new ArrayList<>();
-
     }
+
+
 
     abstract boolean isLeaf();
 
@@ -41,7 +42,7 @@ abstract class BPlusTreeNode {
         int start = 0;
         int end = keys.size();
         while (start < end){
-            int mid = (start + end) / 2;
+            int mid = start + (end - start) / 2;
             if (key > keys.get(mid)){
                 start = mid + 1;
             } else if (key < keys.get(mid)) {
@@ -58,8 +59,34 @@ abstract class BPlusTreeNode {
     boolean hasOverflow() {
         return keys.size() > maxKeys;
     }
+
+    void deleteKey(Integer key){
+        int index = findInsertionIndex(key);
+        keys.remove(index);
+    }
+
+    boolean contains(int key){
+        int start = 0;
+        int end = keys.size();
+        while (start < end){
+            int mid = (start + end) / 2;
+            if (key > keys.get(mid)){
+                start = mid + 1;
+            } else if (key < keys.get(mid)) {
+                end = mid;
+            }
+
+            else{
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Optional later:
     // boolean hasOverflow()
     // int firstKey()
     // List<Integer> keysView()
+
+
 }

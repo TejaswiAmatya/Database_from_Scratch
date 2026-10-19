@@ -196,6 +196,22 @@ public class InMemoryBPlusTree implements BPlusTree {
     @Override
     public void delete(int key) {
         // TODO: implement leaf deletion and underflow handling.
+
+        //search for the key
+        Deque<InternalNode> path = new ArrayDeque<>();
+        LeafNode leaf = findLeafFor(key, path);
+
+        if (leaf.size() + 1 > minChildren()){
+            leaf.deleteKey(key);
+        }
+
+        while (!path.isEmpty()){
+            InternalNode currNode = path.pop();
+
+        }
+
+
+        //
     }
 
     /**
@@ -258,5 +274,13 @@ public class InMemoryBPlusTree implements BPlusTree {
     public void clear() {
         root = new LeafNode(maxKeysPerNode);
         size = 0;
+    }
+
+    public int minChildren(){
+        return Math.ceilDiv(maxKeysPerNode, 2);
+    }
+
+    public int minKeys(){
+        return minChildren() - 1;
     }
 }
