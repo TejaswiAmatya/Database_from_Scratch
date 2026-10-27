@@ -4,6 +4,7 @@ package com.tejaswi.database.index;
 import com.tejaswi.database.record.RecordId;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -254,6 +255,64 @@ class InMemoryBPlusTreeTest {
         assertEquals(new RecordId(100L), tree.search(10));
         assertEquals(new RecordId(300L), tree.search(30));
         assertEquals(new RecordId(500L), tree.search(50));
+    }
+
+    @Test
+    void findSmallestRightReturnsFirstKeyWhenRightmostChildIsLeaf() throws Exception {
+        LeafNode left = leaf(1);
+        LeafNode right = leaf(Integer.MIN_VALUE, -10, 0);
+        InternalNode node = new InternalNode(
+                List.of(Integer.MIN_VALUE), List.of(left, right), 4);
+
+        assertEquals(Integer.MIN_VALUE, invokeFindSmallestRight(node));
+    }
+
+    @Test
+    void findSmallestRightDescendsThroughTheRightmostSubtree() throws Exception {
+        LeafNode leftMostLeaf = leaf(-100);
+        LeafNode nextLeaf = leaf(-50);
+        InternalNode lowerRightSubtree = new InternalNode(
+                List.of(-50), List.of(leftMostLeaf, nextLeaf), 4);
+
+        LeafNode rightMostLeaf = leaf(10);
+        InternalNode rightSubtree = new InternalNode(
+                List.of(-100), List.of(lowerRightSubtree, rightMostLeaf), 4);
+
+        InternalNode root = new InternalNode(
+                List.of(-100), List.of(leaf(-1_000), rightSubtree), 4);
+
+        assertEquals(-100, invokeFindSmallestRight(root));
+    }
+
+    @Test
+    void findSmallestRightUsesTheCurrentInternalNodeAtEveryLevel() throws Exception {
+        LeafNode expectedSmallest = leaf(-300);
+        InternalNode deepest = new InternalNode(
+                List.of(-200), List.of(expectedSmallest, leaf(-200)), 4);
+        InternalNode middle = new InternalNode(
+                List.of(-200), List.of(deepest, leaf(0)), 4);
+        InternalNode root = new InternalNode(
+                List.of(-300), List.of(leaf(-1_000), middle), 4);
+
+        assertEquals(-300, invokeFindSmallestRight(root));
+    }
+
+    private static LeafNode leaf(int... keys) {
+        List<Integer> keyList = new java.util.ArrayList<>();
+        List<RecordId> recordIds = new java.util.ArrayList<>();
+        for (int index = 0; index < keys.length; index++) {
+            int key = keys[index];
+            keyList.add(key);
+            recordIds.add(new RecordId(index + 1L));
+        }
+        return new LeafNode(keyList, recordIds, 4);
+    }
+
+    private static int invokeFindSmallestRight(InternalNode node) throws Exception {
+        Method method = InMemoryBPlusTree.class
+                .getDeclaredMethod("findSmallestRight", InternalNode.class);
+        method.setAccessible(true);
+        return (int) method.invoke(new InMemoryBPlusTree(4), node);
     }
 
 }

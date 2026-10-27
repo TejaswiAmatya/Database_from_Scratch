@@ -247,9 +247,148 @@ public class InMemoryBPlusTree implements BPlusTree {
          *
          * Step 7: Repair an underflowing internal parent.
          *
-         *   After a merge, the parent may have too few children. Move upward
-         *   through the saved path and repeat the same borrow-or-merge idea,
-         *   this time moving child pointers and separator keys together.
+         *   A leaf merge removes one child pointer from its parent and removes
+         *   the separator that used to sit between the two leaf children. The
+         *   parent can therefore become deficient even though the leaf itself
+         *   is now valid. At this point, treat the changed parent as the
+         *   "underflowing node" and move upward one level at a time.
+         *
+         *   Keep these two internal-node relationships in mind while writing
+         *   the repair code:
+         *
+         *       internal.keys.size()     == internal.children().size() - 1
+         *       separator[i]             == first key in children[i + 1]'s subtree
+         *
+         *   A separator is not an independent record. It is a routing copy of
+         *   the smallest key reachable through the child immediately to its
+         *   right. Consequently, every internal borrow or merge must update
+         *   both lists together and must leave the separators sorted.
+         *
+         *   Suggested control flow:
+         *
+         *   1. Start with the internal parent that lost a child during the
+         *      leaf merge. The leaf path was collected from root to leaf, but
+         *      findLeafFor pushes nodes onto a stack. Therefore path.peek()
+         *      is the leaf's immediate parent, and each subsequent pop moves
+         *      toward the root. Do not use the path after consuming it for
+         *      separator maintenance unless you have saved the needed parent
+         *      references first.
+         *
+         *   2. Before doing anything else for an internal node, check whether
+         *      it is the root. The root has a special minimum: it may have
+         *      fewer children than ordinary internal nodes. If it has one
+         *      child, the tree should eventually replace the root with that
+         *      only child. Do not try to borrow from a sibling for the root.
+         *
+         *   3. For a non-root internal node, calculate its child position in
+         *      its parent. The node's left sibling is parent.children()[i - 1]
+         *      when i > 0; its right sibling is parent.children()[i + 1]
+         *      when i + 1 < parent.children().size(). Only compare siblings
+         *      at the same tree level. An internal node must never borrow a
+         *      leaf child, and vice versa.
+         *
+         *   4. Prefer borrowing from the right sibling when that sibling has
+         *      more than minChildren() children. Let:
+         *
+         *          P.keys[i]       = boundary between underflowing node N
+         *                            and right sibling R
+         *          R.children[0]   = R's leftmost child
+         *          R.keys[0]       = R's first separator, if R has one
+         *
+         *      Move the parent separator down into N as a new separator at
+         *      the end of N.keys, then move R.children[0] to the end of
+         *      N.children. Finally replace P.keys[i] with R's new first
+         *      separator. In pseudocode:
+         *
+         *          separatorFromParent = P.keys[i]
+         *          childFromRight      = R.children.remove(0)
+         *          N.keys.add(separatorFromParent)
+         *          N.children.add(childFromRight)
+         *          P.keys[i] = R.keys.remove(0)
+         *
+         *      The order matters. The old parent separator becomes the
+         *      boundary inside N; the right sibling's old first separator is
+         *      replaced by the boundary for R after its leftmost child moved.
+         *      After this operation N has one more child, R has one fewer
+         *      child, and P still has the same number of children and keys.
+         *
+         *   5. If the right sibling cannot lend, try the left sibling when it
+         *      has more than minChildren() children. Let:
+         *
+         *          P.keys[i - 1]   = boundary between left sibling L and N
+         *          L.children[last] = L's rightmost child
+         *
+         *      Move the parent separator down into the front of N.keys, move
+         *      L's rightmost child to the front of N.children, and replace the
+         *      parent separator with the old last separator from L. In
+         *      pseudocode:
+         *
+         *          separatorFromParent = P.keys[i - 1]
+         *          childFromLeft       = L.children.remove(last)
+         *          separatorFromLeft   = L.keys.remove(last)
+         *          N.keys.add(0, separatorFromParent)
+         *          N.children.add(0, childFromLeft)
+         *          P.keys[i - 1] = separatorFromLeft
+         *
+         *      The old parent separator now separates the moved child from
+         *      N's former first child. The separator removed from L becomes
+         *      the new boundary between L and N. This is the mirror image of
+         *      borrowing from the right. Do not simply copy a child pointer:
+         *      remove it from the lender so the total child count is unchanged.
+         *
+         *   6. If neither sibling can lend, merge two internal nodes. Prefer
+         *      merging N with its right sibling when one exists; otherwise
+         *      merge N into its left sibling. A merge consumes one parent
+         *      separator as well as one child pointer:
+         *
+         *          L + P.keys[i] + R
+         *
+         *      becomes one internal node whose contents are:
+         *
+         *          L.keys, then P.keys[i], then R.keys
+         *          L.children, then R.children
+         *
+         *      The parent must then remove R (or N, when merging into L) from
+         *      its children list and remove the separator between them from
+         *      its keys list. For a right merge where N is at child index i:
+         *
+         *          N.keys.add(parent.keys[i])
+         *          N.keys.addAll(R.keys)
+         *          N.children.addAll(R.children)
+         *          parent.children.remove(i + 1)
+         *          parent.keys.remove(i)
+         *
+         *      For a left merge, use the boundary at i - 1, append N's keys
+         *      and children to L, then remove N and parent.keys[i - 1]. The
+         *      resulting merged node must still satisfy keys + 1 == children.
+         *
+         *   7. After a merge, do not stop at the repaired merged node. The
+         *      parent is now the node whose occupancy may have fallen below
+         *      minChildren(). Set the current node to that parent and repeat
+         *      the same process one level higher. A borrow ends propagation
+         *      immediately because the parent did not lose a child. A merge
+         *      continues propagation because it removed one child from the
+         *      parent.
+         *
+         *   8. When propagation reaches the root, apply the root exception:
+         *      if the root is an internal node with exactly one child, promote
+         *      that child to root. The old root becomes unreachable. If the
+         *      root still has two or more children, it is valid even if it has
+         *      fewer keys than minKeys(). An empty root leaf is also valid.
+         *
+         *   Useful checks to add while implementing this step:
+         *
+         *      - Before and after every operation, assert keys.size() + 1
+         *        equals children().size() for each internal node touched.
+         *      - Assert the node's keys remain strictly increasing.
+         *      - Assert every internal child is itself an internal node during
+         *        internal repair.
+         *      - Assert a borrowed lender remains at or above its minimum.
+         *      - Assert a merged node contains all children from both inputs
+         *        exactly once and in left-to-right order.
+         *      - Run searches for keys around every changed separator; a
+         *        separator bug often leaves insertion working but routes an
+         *        exact search into the wrong leaf.
          *
          * Step 8: Shrink the root when necessary.
          *
@@ -265,6 +404,7 @@ public class InMemoryBPlusTree implements BPlusTree {
          *   - Internal-node repair and root shrinking are still TODO.
          */
 
+        //Step 1: Find the target leaf.
         Deque<InternalNode> path = new ArrayDeque<>();
         LeafNode leaf = findLeafFor(key, path);
 
@@ -280,14 +420,10 @@ public class InMemoryBPlusTree implements BPlusTree {
         }
 
         InternalNode parent = path.peek();
-        // Internal keys are separators, not independent records. If the
-        // deleted key was a separator, replace it with the first key in the
-        // right-hand subtree so searches continue to route correctly.
-        while (!path.isEmpty()){
-            InternalNode currNode = path.pop();
+
+        for (InternalNode currNode : path) {
             if (currNode.contains(key) && !leaf.isEmpty()) {
-                int separatorIndex = currNode.findInsertionIndex(key);
-                currNode.keys.set(separatorIndex, leaf.keyAt(0));
+                int index = findSmallestRight(currNode);
             }
         }
 
@@ -345,8 +481,23 @@ public class InMemoryBPlusTree implements BPlusTree {
                     parent.children().remove(childIndex);
                     parent.keys.remove(childIndex - 1);
                 }
+                else {
+
+
+                }
             }
         }
+    }
+
+    private int findSmallestRight(InternalNode node){
+        // Start at the rightmost child, then follow the leftmost child at
+        // each lower internal level. The first key in that leaf is the
+        // smallest key in the rightmost subtree.
+        BPlusTreeNode currNode = node.getLast();
+        while(!currNode.isLeaf()){
+            currNode = ((InternalNode) currNode).getFirst();
+        }
+        return currNode.keyAt(0);
     }
 
     /**

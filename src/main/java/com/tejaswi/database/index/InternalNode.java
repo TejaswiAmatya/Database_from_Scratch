@@ -82,6 +82,10 @@ class InternalNode extends BPlusTreeNode{
         return children.get(index);
     }
 
+    public BPlusTreeNode getFirst(){return children.getFirst();}
+
+    public BPlusTreeNode getLast(){return children.getLast();}
+
     private boolean isOverfull(){
         return keys.size() > maxKeys;
     }
